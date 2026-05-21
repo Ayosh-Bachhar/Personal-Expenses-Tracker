@@ -5,6 +5,10 @@ const GoogleAuthContext = createContext(null);
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 const GOOGLE_SCOPE = 'https://www.googleapis.com/auth/spreadsheets';
 
+function getRedirectUri() {
+  return `${window.location.origin}/login`;
+}
+
 function loadGoogleIdentityScript() {
   return new Promise((resolve, reject) => {
     if (
@@ -41,11 +45,37 @@ function loadGoogleIdentityScript() {
   });
 }
 
+function getAccessTokenFromUrl() {
+  const hash = window.location.hash;
+
+  if (!hash) {
+    return '';
+  }
+
+  const hashParams = new URLSearchParams(hash.replace('#', ''));
+  return hashParams.get('access_token') || '';
+}
+
 export function GoogleAuthProvider({ children }) {
   const [accessToken, setAccessToken] = useState('');
   const [isGoogleReady, setIsGoogleReady] = useState(false);
   const [loginError, setLoginError] = useState('');
   const [tokenClient, setTokenClient] = useState(null);
+
+  useEffect(() => {
+    const redirectedAccessToken = getAccessTokenFromUrl();
+
+    if (redirectedAccessToken) {
+      setAccessToken(redirectedAccessToken);
+      setLoginError('');
+
+      window.history.replaceState(
+        {},
+        document.title,
+        window.location.pathname
+      );
+    }
+  }, []);
 
   useEffect(() => {
     async function prepareGoogleLogin() {
@@ -60,18 +90,8 @@ export function GoogleAuthProvider({ children }) {
         const client = window.google.accounts.oauth2.initTokenClient({
           client_id: GOOGLE_CLIENT_ID,
           scope: GOOGLE_SCOPE,
-          
-          callback: (tokenResponse) => {
-            if (tokenResponse && tokenResponse.access_token) {
-              setAccessToken(tokenResponse.access_token);
-              setLoginError('');
-            } else {
-              setLoginError('Google login failed. No access token received.');
-            }
-          },
-          error_callback: () => {
-            setLoginError('Google login popup was closed or blocked.');
-          },
+          ux_mode: 'redirect',
+          redirect_uri: getRedirectUri(),
         });
 
         setTokenClient(client);
