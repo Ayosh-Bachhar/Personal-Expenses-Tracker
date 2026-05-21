@@ -823,5 +823,3 @@ After setup, test these actions:
 ## License
 
 This project is for learning and personal use.
-
-```
