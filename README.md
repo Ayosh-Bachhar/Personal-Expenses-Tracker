@@ -1,7 +1,7 @@
 
 # Personal Expenses Tracker
 
-A secure, online-only personal finance tracker built with React, Vite, Tailwind CSS, Google OAuth, and Google Sheets API.
+A secure, online only personal finance tracker built with React, Vite, Tailwind CSS, Google OAuth, and Google Sheets API.
 
 This project uses a personal Google Spreadsheet as the database. There is no backend server, no Firebase, no traditional database, and no offline financial-data storage.
 
@@ -25,10 +25,10 @@ https://personal-expenses-tracker-tau.vercel.app
 * Custom expense tag creation
 * Debt log
 * Debt Given protection based on current available wallet
-* Monthly sheet-based financial records
+* Monthly sheet based financial records
 * Automatic current-month sheet creation
 * Monthly, yearly, and all-time financial summaries
-* Expense-by-tag chart
+* Expense_by_tag chart
 * Balance vs expenses trend chart
 * Rule-based financial advice
 * Dark responsive UI
