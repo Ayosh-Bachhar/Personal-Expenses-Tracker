@@ -1,10 +1,11 @@
-import { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 
 const GoogleAuthContext = createContext(null);
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 const GOOGLE_SCOPE = 'https://www.googleapis.com/auth/spreadsheets';
 const TOKEN_STORAGE_KEY = 'personal_expenses_tracker_google_access_token';
+const AUTO_LOGOUT_TIME_MS = 5 * 60 * 1000;
 
 function getRedirectUri() {
   return `${window.location.origin}/login`;
@@ -56,6 +57,7 @@ export function GoogleAuthProvider({ children }) {
   const [accessToken, setAccessToken] = useState('');
   const [isGoogleReady, setIsGoogleReady] = useState(false);
   const [loginError, setLoginError] = useState('');
+  const inactivityTimerRef = useRef(null);
 
   useEffect(() => {
     if (!GOOGLE_CLIENT_ID) {
@@ -104,6 +106,56 @@ export function GoogleAuthProvider({ children }) {
 
     setIsGoogleReady(true);
   }, []);
+
+  useEffect(() => {
+    if (!accessToken) {
+      return undefined;
+    }
+
+    const activityEvents = [
+      'mousemove',
+      'mousedown',
+      'keydown',
+      'scroll',
+      'touchstart',
+      'click',
+    ];
+
+    function clearInactivityTimer() {
+      if (inactivityTimerRef.current) {
+        clearTimeout(inactivityTimerRef.current);
+      }
+    }
+
+    function autoLogoutUser() {
+      sessionStorage.removeItem(TOKEN_STORAGE_KEY);
+      setAccessToken('');
+      setLoginError('You were logged out after 5 minutes of inactivity.');
+      window.location.href = '/login';
+    }
+
+    function resetInactivityTimer() {
+      clearInactivityTimer();
+
+      inactivityTimerRef.current = setTimeout(() => {
+        autoLogoutUser();
+      }, AUTO_LOGOUT_TIME_MS);
+    }
+
+    resetInactivityTimer();
+
+    activityEvents.forEach((eventName) => {
+      window.addEventListener(eventName, resetInactivityTimer);
+    });
+
+    return () => {
+      clearInactivityTimer();
+
+      activityEvents.forEach((eventName) => {
+        window.removeEventListener(eventName, resetInactivityTimer);
+      });
+    };
+  }, [accessToken]);
 
   function login() {
     setLoginError('');
