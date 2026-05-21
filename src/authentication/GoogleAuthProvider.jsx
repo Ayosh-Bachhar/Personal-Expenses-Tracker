@@ -4,45 +4,10 @@ const GoogleAuthContext = createContext(null);
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 const GOOGLE_SCOPE = 'https://www.googleapis.com/auth/spreadsheets';
+const TOKEN_STORAGE_KEY = 'personal_expenses_tracker_google_access_token';
 
 function getRedirectUri() {
   return `${window.location.origin}/login`;
-}
-
-function loadGoogleIdentityScript() {
-  return new Promise((resolve, reject) => {
-    if (
-      window.google &&
-      window.google.accounts &&
-      window.google.accounts.oauth2
-    ) {
-      resolve();
-      return;
-    }
-
-    const existingScript = document.querySelector(
-      'script[src="https://accounts.google.com/gsi/client"]'
-    );
-
-    if (existingScript) {
-      existingScript.addEventListener('load', resolve);
-      existingScript.addEventListener('error', reject);
-      return;
-    }
-
-    const script = document.createElement('script');
-    script.src = 'https://accounts.google.com/gsi/client';
-    script.async = true;
-    script.defer = true;
-
-    script.onload = resolve;
-
-    script.onerror = () => {
-      reject(new Error('Failed to load Google Identity Services script.'));
-    };
-
-    document.body.appendChild(script);
-  });
 }
 
 function getAccessTokenFromUrl() {
@@ -56,16 +21,68 @@ function getAccessTokenFromUrl() {
   return hashParams.get('access_token') || '';
 }
 
+function getOAuthErrorFromUrl() {
+  const hash = window.location.hash;
+
+  if (!hash) {
+    return '';
+  }
+
+  const hashParams = new URLSearchParams(hash.replace('#', ''));
+  const error = hashParams.get('error') || '';
+  const errorDescription = hashParams.get('error_description') || '';
+
+  if (errorDescription) {
+    return errorDescription;
+  }
+
+  return error;
+}
+
+function buildGoogleOAuthUrl() {
+  const oauthUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
+
+  oauthUrl.searchParams.set('client_id', GOOGLE_CLIENT_ID);
+  oauthUrl.searchParams.set('redirect_uri', getRedirectUri());
+  oauthUrl.searchParams.set('response_type', 'token');
+  oauthUrl.searchParams.set('scope', GOOGLE_SCOPE);
+  oauthUrl.searchParams.set('include_granted_scopes', 'true');
+  oauthUrl.searchParams.set('prompt', 'consent');
+
+  return oauthUrl.toString();
+}
+
 export function GoogleAuthProvider({ children }) {
   const [accessToken, setAccessToken] = useState('');
   const [isGoogleReady, setIsGoogleReady] = useState(false);
   const [loginError, setLoginError] = useState('');
-  const [tokenClient, setTokenClient] = useState(null);
 
   useEffect(() => {
+    if (!GOOGLE_CLIENT_ID) {
+      setLoginError('Google Client ID is missing.');
+      setIsGoogleReady(false);
+      return;
+    }
+
+    const oauthError = getOAuthErrorFromUrl();
+
+    if (oauthError) {
+      setLoginError(oauthError);
+
+      window.history.replaceState(
+        {},
+        document.title,
+        window.location.pathname
+      );
+
+      setIsGoogleReady(true);
+      return;
+    }
+
     const redirectedAccessToken = getAccessTokenFromUrl();
 
     if (redirectedAccessToken) {
+      sessionStorage.setItem(TOKEN_STORAGE_KEY, redirectedAccessToken);
       setAccessToken(redirectedAccessToken);
       setLoginError('');
 
@@ -74,55 +91,35 @@ export function GoogleAuthProvider({ children }) {
         document.title,
         window.location.pathname
       );
-    }
-  }, []);
 
-  useEffect(() => {
-    async function prepareGoogleLogin() {
-      try {
-        if (!GOOGLE_CLIENT_ID) {
-          setLoginError('Google Client ID is missing.');
-          return;
-        }
-
-        await loadGoogleIdentityScript();
-
-        const client = window.google.accounts.oauth2.initTokenClient({
-          client_id: GOOGLE_CLIENT_ID,
-          scope: GOOGLE_SCOPE,
-          ux_mode: 'redirect',
-          redirect_uri: getRedirectUri(),
-        });
-
-        setTokenClient(client);
-        setIsGoogleReady(true);
-      } catch (error) {
-        setLoginError(error.message || 'Google login initialization failed.');
-      }
+      setIsGoogleReady(true);
+      return;
     }
 
-    prepareGoogleLogin();
+    const savedAccessToken = sessionStorage.getItem(TOKEN_STORAGE_KEY);
+
+    if (savedAccessToken) {
+      setAccessToken(savedAccessToken);
+    }
+
+    setIsGoogleReady(true);
   }, []);
 
   function login() {
     setLoginError('');
 
-    if (!tokenClient) {
-      setLoginError('Google login is not ready yet. Please wait and try again.');
+    if (!GOOGLE_CLIENT_ID) {
+      setLoginError('Google Client ID is missing.');
       return;
     }
 
-    tokenClient.requestAccessToken({
-      prompt: 'consent',
-    });
+    window.location.href = buildGoogleOAuthUrl();
   }
 
   function logout() {
-    if (accessToken && window.google && window.google.accounts) {
-      window.google.accounts.oauth2.revoke(accessToken);
-    }
-
+    sessionStorage.removeItem(TOKEN_STORAGE_KEY);
     setAccessToken('');
+    setLoginError('');
   }
 
   const authValue = useMemo(
