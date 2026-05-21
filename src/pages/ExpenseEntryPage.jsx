@@ -135,6 +135,34 @@ function ExpenseEntryPage() {
     return '';
   }
 
+  function calculateCurrentAvailableWallet(data) {
+    const totalInput = data.balanceRows.reduce((sum, row) => {
+      return sum + Number(row.amount || 0);
+    }, 0);
+  
+    const totalExpenses = data.expenseRows.reduce((sum, row) => {
+      return sum + Number(row.amount || 0);
+    }, 0);
+  
+    const activeDebtGiven = data.debtRows.reduce((sum, row) => {
+      if (row.status === 'Given' && row.isSettled !== true) {
+        return sum + Number(row.amount || 0);
+      }
+  
+      return sum;
+    }, 0);
+  
+    const activeDebtTaken = data.debtRows.reduce((sum, row) => {
+      if (row.status === 'Taken' && row.isSettled !== true) {
+        return sum + Number(row.amount || 0);
+      }
+  
+      return sum;
+    }, 0);
+  
+    return totalInput - totalExpenses - activeDebtGiven + activeDebtTaken;
+  }
+
   async function addNewTagIfNeeded(finalTag) {
     const alreadyExists = tagOptions.some((tag) => {
       return tag.toLowerCase() === finalTag.toLowerCase();
@@ -180,9 +208,20 @@ function ExpenseEntryPage() {
 
     try {
       setIsSaving(true);
-
+    
+      const data = await loadAllSpreadsheetData();
+      const currentAvailableWallet = calculateCurrentAvailableWallet(data);
+      const expenseAmount = sanitizeAmount(formData.amount);
+    
+      if (expenseAmount > currentAvailableWallet) {
+        setErrorMessage(
+          `You cannot spend ${expenseAmount}. Current available wallet is ${currentAvailableWallet}.`
+        );
+        return;
+      }
+    
       await addNewTagIfNeeded(finalTag);
-
+    
       await addMonthlyRow({
         sheetName: currentMonthSheetName,
         rowValues,
