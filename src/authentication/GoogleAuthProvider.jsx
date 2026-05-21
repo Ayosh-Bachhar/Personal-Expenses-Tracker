@@ -1,74 +1,118 @@
-import { createContext, useContext, useMemo, useState } from 'react';
-import { GoogleOAuthProvider, useGoogleLogin } from '@react-oauth/google';
+import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 
 const GoogleAuthContext = createContext(null);
 
-const GOOGLE_SHEETS_SCOPE = 'https://www.googleapis.com/auth/spreadsheets';
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+const GOOGLE_SCOPE = 'https://www.googleapis.com/auth/spreadsheets';
 
-export function GoogleAuthProvider({ children }) {
-  const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+function loadGoogleIdentityScript() {
+  return new Promise((resolve, reject) => {
+    if (
+      window.google &&
+      window.google.accounts &&
+      window.google.accounts.oauth2
+    ) {
+      resolve();
+      return;
+    }
 
-  if (!googleClientId) {
-    return (
-      <main className="flex min-h-screen items-center justify-center bg-slate-950 px-4 text-slate-100">
-        <section className="max-w-xl rounded-3xl border border-rose-500/30 bg-rose-500/10 p-8">
-          <h1 className="text-2xl font-black text-rose-300">
-            Google Client ID Missing
-          </h1>
-
-          <p className="mt-4 text-sm leading-6 text-slate-300">
-            Create a <span className="font-bold">.env</span> file in the project
-            root and add:
-          </p>
-
-          <pre className="mt-4 overflow-x-auto rounded-2xl bg-slate-950 p-4 text-xs text-rose-200">
-            VITE_GOOGLE_CLIENT_ID=your_google_client_id_here
-          </pre>
-
-          <p className="mt-4 text-sm leading-6 text-slate-400">
-            Restart the development server after adding it.
-          </p>
-        </section>
-      </main>
+    const existingScript = document.querySelector(
+      'script[src="https://accounts.google.com/gsi/client"]'
     );
-  }
 
-  return (
-    <GoogleOAuthProvider clientId={googleClientId}>
-      <GoogleAuthStateProvider>{children}</GoogleAuthStateProvider>
-    </GoogleOAuthProvider>
-  );
+    if (existingScript) {
+      existingScript.addEventListener('load', resolve);
+      existingScript.addEventListener('error', reject);
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.src = 'https://accounts.google.com/gsi/client';
+    script.async = true;
+    script.defer = true;
+
+    script.onload = resolve;
+
+    script.onerror = () => {
+      reject(new Error('Failed to load Google Identity Services script.'));
+    };
+
+    document.body.appendChild(script);
+  });
 }
 
-function GoogleAuthStateProvider({ children }) {
+export function GoogleAuthProvider({ children }) {
   const [accessToken, setAccessToken] = useState('');
+  const [isGoogleReady, setIsGoogleReady] = useState(false);
   const [loginError, setLoginError] = useState('');
+  const [tokenClient, setTokenClient] = useState(null);
 
-  const login = useGoogleLogin({
-    scope: GOOGLE_SHEETS_SCOPE,
-    onSuccess: (tokenResponse) => {
-      setAccessToken(tokenResponse.access_token);
-      setLoginError('');
-    },
-    onError: () => {
-      setLoginError('Google login failed. Please try again.');
-    },
-  });
+  useEffect(() => {
+    async function prepareGoogleLogin() {
+      try {
+        if (!GOOGLE_CLIENT_ID) {
+          setLoginError('Google Client ID is missing.');
+          return;
+        }
+
+        await loadGoogleIdentityScript();
+
+        const client = window.google.accounts.oauth2.initTokenClient({
+          client_id: GOOGLE_CLIENT_ID,
+          scope: GOOGLE_SCOPE,
+          prompt: 'consent',
+          callback: (tokenResponse) => {
+            if (tokenResponse && tokenResponse.access_token) {
+              setAccessToken(tokenResponse.access_token);
+              setLoginError('');
+            } else {
+              setLoginError('Google login failed. No access token received.');
+            }
+          },
+          error_callback: () => {
+            setLoginError('Google login popup was closed or blocked.');
+          },
+        });
+
+        setTokenClient(client);
+        setIsGoogleReady(true);
+      } catch (error) {
+        setLoginError(error.message || 'Google login initialization failed.');
+      }
+    }
+
+    prepareGoogleLogin();
+  }, []);
+
+  function login() {
+    setLoginError('');
+
+    if (!tokenClient) {
+      setLoginError('Google login is not ready yet. Please wait and try again.');
+      return;
+    }
+
+    tokenClient.requestAccessToken();
+  }
 
   function logout() {
+    if (accessToken && window.google && window.google.accounts) {
+      window.google.accounts.oauth2.revoke(accessToken);
+    }
+
     setAccessToken('');
-    setLoginError('');
   }
 
   const authValue = useMemo(
     () => ({
       accessToken,
       isAuthenticated: Boolean(accessToken),
+      isGoogleReady,
+      loginError,
       login,
       logout,
-      loginError,
     }),
-    [accessToken, login, loginError]
+    [accessToken, isGoogleReady, loginError]
   );
 
   return (
@@ -87,3 +131,5 @@ export function useGoogleAuth() {
 
   return context;
 }
+
+export default GoogleAuthProvider;
