@@ -1,4 +1,4 @@
-````md
+
 # Personal Expenses Tracker
 
 A secure, online-only personal finance tracker built with React, Vite, Tailwind CSS, Google OAuth, and Google Sheets API.
