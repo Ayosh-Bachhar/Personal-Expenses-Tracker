@@ -168,7 +168,28 @@ export function useGoogleSheetsApi({ accessToken, spreadsheetId }) {
     const currentMonthSheetName = getCurrentMonthSheetName();
 
     if (!existingSheetNames.includes(currentMonthSheetName)) {
-      throw new Error(`Missing current month sheet: ${currentMonthSheetName}`);
+      await batchUpdateSpreadsheet({
+        spreadsheetId,
+        accessToken,
+        requests: [
+          {
+            addSheet: {
+              properties: {
+                title: currentMonthSheetName,
+              },
+            },
+          },
+        ],
+      });
+    
+      await updateSheetValues({
+        spreadsheetId,
+        accessToken,
+        range: `${currentMonthSheetName}!A1:M1`,
+        values: [MONTHLY_HEADERS],
+      });
+    
+      return true;
     }
 
     const currentMonthHeaderResult = await readSheetValues({
