@@ -60,7 +60,7 @@ export function GoogleAuthProvider({ children }) {
         const client = window.google.accounts.oauth2.initTokenClient({
           client_id: GOOGLE_CLIENT_ID,
           scope: GOOGLE_SCOPE,
-          prompt: 'consent',
+          
           callback: (tokenResponse) => {
             if (tokenResponse && tokenResponse.access_token) {
               setAccessToken(tokenResponse.access_token);
@@ -92,7 +92,9 @@ export function GoogleAuthProvider({ children }) {
       return;
     }
 
-    tokenClient.requestAccessToken();
+    tokenClient.requestAccessToken({
+      prompt: 'consent',
+    });
   }
 
   function logout() {
