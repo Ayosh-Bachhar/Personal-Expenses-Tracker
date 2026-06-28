@@ -44,8 +44,7 @@ function GoogleLoginPage() {
         ) : null}
 
         <p className="mt-5 text-xs leading-5 text-slate-500">
-          Requested permission: Google Sheets access only. No Google Drive-wide
-          permission is requested.
+          Requested permission: Google Sheets access only.
         </p>
       </section>
     </main>

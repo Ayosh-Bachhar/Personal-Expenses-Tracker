@@ -7,7 +7,7 @@ function HomeMenuPage() {
     <section className="pb-24">
       <PageTitleBar
         title="Main Menu"
-        subtitle="Choose what you want to record or analyze. Your money data will be stored in your own Google Spreadsheet."
+        subtitle="Your financial data will be stored in your own Google Spreadsheet."
       />
 
       <div className="grid gap-4 sm:grid-cols-2">
@@ -23,7 +23,7 @@ function HomeMenuPage() {
           to="/expenses"
           icon={<ReceiptText size={32} />}
           title="Expenses Entry"
-          description="Log daily expenses with tag, payment medium, and priority flag."
+          description="Log your daily expenses with tag, payment medium, and priority flag."
           accent="text-cyan-400"
         />
 
@@ -31,7 +31,7 @@ function HomeMenuPage() {
           to="/debts"
           icon={<HandCoins size={32} />}
           title="Debt Log"
-          description="Track money you gave to others or money you took from someone."
+          description="Track the money you gave to others and the money you took from someone."
           accent="text-amber-400"
         />
 
@@ -39,7 +39,7 @@ function HomeMenuPage() {
           to="/summary"
           icon={<ChartPie size={32} />}
           title="Summary"
-          description="View monthly/yearly financial overview, charts, and rule-based advice."
+          description="View your (monthly/yearly) financial overview, charts, and rule-based advice."
           accent="text-violet-400"
         />
       </div>
