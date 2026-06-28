@@ -242,7 +242,7 @@ function ExpenseEntryPage() {
     <section className="pb-24">
       <PageTitleBar
         title="Expenses Entry"
-        subtitle="Record daily spending by tag, payment medium, and priority flag."
+        subtitle="Record daily expenses by tag, payment medium, and priority flag."
       />
 
       <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
@@ -262,7 +262,7 @@ function ExpenseEntryPage() {
             />
 
             <SelectDropdownField
-              label={isLoadingTags ? 'Tag / Category loading...' : 'Tag / Category'}
+              label={isLoadingTags ? 'Tag / Category loading...' : 'Tag (Category)'}
               name="tag"
               value={formData.tag}
               onChange={handleInputChange}
@@ -334,7 +334,7 @@ function ExpenseEntryPage() {
         <div className="space-y-5">
           <SecurityWarningBox
             title="Expense Entry Security"
-            message="This expense is written directly into the current monthly Google Sheet. New custom tags are added to the Tags sheet automatically."
+            message="This expense entry is recorded directly into the current month's Google Sheet. New custom tags will be added to the Tags sheet automatically."
           />
 
           <div className="rounded-3xl border border-slate-800 bg-slate-900/80 p-6">

@@ -120,7 +120,7 @@ function BalanceEntryPage() {
     <section className="pb-24">
       <PageTitleBar
         title="Balance Entry"
-        subtitle="Record money entering your wallet or account."
+        subtitle="Record your money entry data to your account."
       />
 
       <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
@@ -180,20 +180,20 @@ function BalanceEntryPage() {
         <div className="space-y-5">
           <SecurityWarningBox
             title="Balance Entry Security"
-            message="This entry is written directly into the current monthly Google Sheet. The app does not save your balance data in browser storage."
+            message="This entry is recorded directly into the current month's Google Sheet. The app does not save your balance data in browser storage."
           />
 
           <div className="rounded-3xl border border-slate-800 bg-slate-900/80 p-6">
             <h2 className="text-xl font-black text-slate-100">
-              Saved into monthly sheet
+              Entry committed to the monthly sheet
             </h2>
 
             <div className="mt-4 space-y-2 text-sm leading-6 text-slate-400">
-              <p>Current sheet:</p>
+              <p>Current sheet status:</p>
               <p className="rounded-2xl bg-slate-950 p-4 text-xs text-emerald-300">
                 {getCurrentMonthSheetName()}
               </p>
-              <p>Date format:</p>
+              <p>Date:</p>
               <p className="rounded-2xl bg-slate-950 p-4 text-xs text-slate-300">
                 {getTodayDisplayDate()}
               </p>

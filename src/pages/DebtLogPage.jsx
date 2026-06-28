@@ -171,7 +171,7 @@ function DebtLogPage() {
     <section className="pb-24">
       <PageTitleBar
         title="Debt Log"
-        subtitle="Track money you gave to others or money you took from someone."
+        subtitle="Track the money you gave to others and the money you took from someone."
       />
 
       <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
@@ -251,7 +251,7 @@ function DebtLogPage() {
         <div className="space-y-5">
           <SecurityWarningBox
             title="Debt Balance Protection"
-            message="Debt Given is blocked if your calculated available wallet is not enough. Debt Taken is allowed because it means borrowed money is entering your financial position."
+            message="Debt given is restricted if your wallet balance is too low. Debt taken is permitted, as borrowed funds increase your current balance."
           />
 
           <div className="rounded-3xl border border-slate-800 bg-slate-900/80 p-6">
