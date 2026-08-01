@@ -204,6 +204,8 @@ function FinancialSummaryPage() {
         </p>
       ) : null}
 
+      {/* Core stat cards — kept separate from the Debt cards below so an
+          expanded "Details" panel never stretches these boxes. */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <SummaryCard
           title="Total Input"
@@ -236,7 +238,31 @@ function FinancialSummaryPage() {
           icon={<Banknote size={28} />}
           accent="text-violet-400"
         />
+      </div>
 
+      <div className="mt-4 grid gap-4 sm:grid-cols-2">
+        <SummaryCard
+          title="Net Debt Position"
+          value={formatCurrency(summary.netDebtPosition, currency)}
+          subtitle="Debt given minus debt taken"
+          icon={<ChartPie size={28} />}
+          accent="text-blue-400"
+        />
+
+        <SummaryCard
+          title="Records Loaded"
+          value={
+            spreadsheetData.balanceRows.length +
+            spreadsheetData.expenseRows.length +
+            spreadsheetData.debtRows.length
+          }
+          subtitle="Balance + expense + debt records"
+          icon={<RefreshCw size={28} />}
+          accent="text-slate-300"
+        />
+      </div>
+
+      <div className="mt-4 grid gap-4 lg:grid-cols-2">
         <DebtSummaryCard
           title="Debt Given"
           value={formatCurrency(summary.debtGiven, currency)}
@@ -268,26 +294,6 @@ function FinancialSummaryPage() {
           increaseLabel="Taken"
           decreaseLabel="Paid Back"
         />
-
-        <SummaryCard
-          title="Net Debt Position"
-          value={formatCurrency(summary.netDebtPosition, currency)}
-          subtitle="Debt given minus debt taken"
-          icon={<ChartPie size={28} />}
-          accent="text-blue-400"
-        />
-
-        <SummaryCard
-          title="Records Loaded"
-          value={
-            spreadsheetData.balanceRows.length +
-            spreadsheetData.expenseRows.length +
-            spreadsheetData.debtRows.length
-          }
-          subtitle="Balance + expense + debt records"
-          icon={<RefreshCw size={28} />}
-          accent="text-slate-300"
-        />
       </div>
 
       <div className="mt-6 grid gap-6 xl:grid-cols-2">
@@ -303,7 +309,9 @@ function FinancialSummaryPage() {
                     >
                       <div className="flex items-start justify-between gap-4">
                         <div className="min-w-0">
-                          <p className="text-base font-bold text-slate-100">{item.name}</p>
+                          <p className="truncate text-base font-bold text-slate-100">
+                            {item.name}
+                          </p>
                           {item.updateNote ? (
                             <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-amber-300">
                               {item.updateNote}
@@ -507,7 +515,7 @@ function DebtSummaryCard({
           ) : null}
         </div>
 
-        {icon ? <div className={accent}>{icon}</div> : null}
+        {icon ? <div className={`shrink-0 ${accent}`}>{icon}</div> : null}
       </div>
 
       <button
@@ -520,7 +528,7 @@ function DebtSummaryCard({
 
       {isOpen ? (
         <div className="mt-4 rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm font-bold text-slate-300">{detailsHeading}</p>
 
             <label className="flex shrink-0 items-center gap-2 text-xs font-semibold text-slate-400">
@@ -535,14 +543,14 @@ function DebtSummaryCard({
           </div>
 
           {visibleDetails.length > 0 ? (
-            <div className="mt-3 max-h-72 space-y-3 overflow-y-auto pr-1">
+            <div className="mt-3 max-h-80 space-y-3 overflow-y-auto pr-1">
               {visibleDetails.map((item) => (
                 <div
                   key={item.name}
                   className="rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3"
                 >
-                  <div className="flex items-start justify-between gap-4">
-                    <p className="min-w-0 text-base font-bold text-slate-100">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="min-w-0 truncate text-base font-bold text-slate-100">
                       {item.name}
                     </p>
 
@@ -557,26 +565,26 @@ function DebtSummaryCard({
                     )}
                   </div>
 
-                  <div className="mt-3 grid grid-cols-3 gap-2 text-xs text-slate-400">
-                    <div>
-                      <p className="text-slate-500">{increaseLabel}</p>
-                      <p className="mt-1 text-sm font-bold text-slate-200">
+                  <div className="mt-3 space-y-1.5 border-t border-slate-800 pt-3">
+                    <div className="flex items-baseline justify-between gap-3">
+                      <span className="text-xs text-slate-500">{increaseLabel}</span>
+                      <span className="text-sm font-bold text-slate-200">
                         {formatCurrency(item.increaseTotal, currency)}
-                      </p>
+                      </span>
                     </div>
 
-                    <div>
-                      <p className="text-slate-500">{decreaseLabel}</p>
-                      <p className="mt-1 text-sm font-bold text-slate-200">
+                    <div className="flex items-baseline justify-between gap-3">
+                      <span className="text-xs text-slate-500">{decreaseLabel}</span>
+                      <span className="text-sm font-bold text-slate-200">
                         {formatCurrency(item.decreaseTotal, currency)}
-                      </p>
+                      </span>
                     </div>
 
-                    <div>
-                      <p className="text-slate-500">Remaining</p>
-                      <p className="mt-1 text-sm font-bold text-emerald-300">
+                    <div className="flex items-baseline justify-between gap-3">
+                      <span className="text-xs text-slate-500">Remaining</span>
+                      <span className="text-sm font-black text-emerald-300">
                         {formatCurrency(Math.max(item.remaining, 0), currency)}
-                      </p>
+                      </span>
                     </div>
                   </div>
                 </div>
