@@ -1,4 +1,4 @@
-import { getYearKey, getYearMonthKey } from './dateFormatter.js';
+import { getYearKey, getYearMonthKey, parseDisplayDate } from './dateFormatter.js';
 
 function toNumber(value) {
   const numberValue = Number(value);
@@ -22,65 +22,166 @@ function isWithinSelectedPeriod(timestamp, summaryType, selectedValue) {
   return true;
 }
 
-function normalizeTag(value) {
-  return String(value || '').trim() || 'Other';
+function normalizeText(value, fallback = 'Unknown') {
+  const text = String(value || '').trim();
+  return text || fallback;
 }
 
-function getTimestampValue(timestamp) {
-  const date = new Date(timestamp);
-  const time = date.getTime();
+function getTimestampSortValue(timestamp) {
+  const parsedDate = parseDisplayDate(timestamp);
 
-  return Number.isNaN(time) ? 0 : time;
+  if (!parsedDate) {
+    return Number.NEGATIVE_INFINITY;
+  }
+
+  return parsedDate.getTime();
 }
 
-function buildExpenseTagList(filteredExpenseRows) {
-  const tagMap = new Map();
+function isLaterExpenseRow(firstRow, firstIndex, secondRow, secondIndex) {
+  const firstSortValue = getTimestampSortValue(firstRow.timestamp);
+  const secondSortValue = getTimestampSortValue(secondRow.timestamp);
 
-  filteredExpenseRows.forEach((row, index) => {
-    const tagName = normalizeTag(row.tag);
-    const key = tagName.toLowerCase();
+  if (firstSortValue !== secondSortValue) {
+    return firstSortValue > secondSortValue;
+  }
+
+  return firstIndex > secondIndex;
+}
+
+function buildExpenseTagSummary(expenseRows = []) {
+  const tagBuckets = new Map();
+
+  expenseRows.forEach((row, index) => {
+    const tag = normalizeText(row.tag, 'Other');
     const amount = toNumber(row.amount);
-    const timestampValue = getTimestampValue(row.timestamp);
 
-    if (!tagMap.has(key)) {
-      tagMap.set(key, {
-        name: tagName,
+    if (!tagBuckets.has(tag)) {
+      tagBuckets.set(tag, {
+        rows: [],
         total: 0,
-        firstIndex: index,
-        latestTimestamp: timestampValue,
-        latestIndex: index,
-        latestAmount: amount,
       });
     }
 
-    const entry = tagMap.get(key);
-    entry.total += amount;
+    const tagBucket = tagBuckets.get(tag);
+    tagBucket.rows.push({
+      row,
+      index,
+    });
+    tagBucket.total += amount;
+  });
 
-    if (
-      timestampValue > entry.latestTimestamp ||
-      (timestampValue === entry.latestTimestamp && index > entry.latestIndex)
-    ) {
-      entry.latestTimestamp = timestampValue;
-      entry.latestIndex = index;
-      entry.latestAmount = amount;
+  let latestExpenseRow = null;
+
+  expenseRows.forEach((row, index) => {
+    if (!latestExpenseRow) {
+      latestExpenseRow = {
+        row,
+        index,
+      };
+      return;
+    }
+
+    if (isLaterExpenseRow(row, index, latestExpenseRow.row, latestExpenseRow.index)) {
+      latestExpenseRow = {
+        row,
+        index,
+      };
     }
   });
 
-  return Array.from(tagMap.values())
-    .sort((a, b) => a.firstIndex - b.firstIndex)
-    .map((entry) => {
-      const previousTotal = entry.total - entry.latestAmount;
+  const expenseTagList = [];
 
-      return {
-        name: entry.name,
-        total: entry.total,
-        note:
-          previousTotal > 0
-            ? `UPDATED (Net total increased by ${entry.latestAmount} from ${previousTotal})`
-            : '',
-        isUpdated: previousTotal > 0,
-      };
+  tagBuckets.forEach((tagBucket, tag) => {
+    let latestTagRow = null;
+
+    tagBucket.rows.forEach((entry) => {
+      if (!latestTagRow) {
+        latestTagRow = entry;
+        return;
+      }
+
+      if (
+        isLaterExpenseRow(
+          entry.row,
+          entry.index,
+          latestTagRow.row,
+          latestTagRow.index
+        )
+      ) {
+        latestTagRow = entry;
+      }
     });
+
+    const latestAmount = latestTagRow ? toNumber(latestTagRow.row.amount) : 0;
+    const previousTotal = tagBucket.total - latestAmount;
+    const isUpdatedTag =
+      latestExpenseRow !== null &&
+      latestTagRow !== null &&
+      latestTagRow.index === latestExpenseRow.index &&
+      latestTagRow.row === latestExpenseRow.row;
+
+    expenseTagList.push({
+      name: tag,
+      total: tagBucket.total,
+      latestAmount,
+      previousTotal,
+      isUpdated: isUpdatedTag,
+      updateNote: isUpdatedTag
+        ? `UPDATED (Net total increased by ${latestAmount} from ${previousTotal})`
+        : '',
+    });
+  });
+
+  return {
+    expensesByTag: expenseTagList.reduce((accumulator, item) => {
+      accumulator[item.name] = item.total;
+      return accumulator;
+    }, {}),
+    expenseTagList,
+  };
+}
+
+function buildDebtPersonSummary(debtRows = [], targetStatus) {
+  const personBuckets = new Map();
+
+  debtRows.forEach((row, index) => {
+    if (row.status !== targetStatus || row.isSettled === true) {
+      return;
+    }
+
+    const personName = normalizeText(row.name, 'Unknown');
+    const key = personName.toLowerCase();
+    const amount = toNumber(row.amount);
+
+    if (!personBuckets.has(key)) {
+      personBuckets.set(key, {
+        name: personName,
+        total: 0,
+        firstIndex: index,
+      });
+    }
+
+    const personBucket = personBuckets.get(key);
+    personBucket.total += amount;
+
+    if (index < personBucket.firstIndex) {
+      personBucket.firstIndex = index;
+      personBucket.name = personName;
+    }
+  });
+
+  return Array.from(personBuckets.values())
+    .sort((firstItem, secondItem) => {
+      if (secondItem.total !== firstItem.total) {
+        return secondItem.total - firstItem.total;
+      }
+
+      return firstItem.name.localeCompare(secondItem.name);
+    })
+    .map((item) => ({
+      name: item.name,
+      total: item.total,
+    }));
 }
 
 export function calculateFinancialSummary({
@@ -131,13 +232,12 @@ export function calculateFinancialSummary({
   const netDebtPosition = debtGiven - debtTaken;
   const financialPosition = availableWallet + netDebtPosition;
 
-  const expenseTagList = buildExpenseTagList(filteredExpenseRows);
+  const { expensesByTag, expenseTagList } = buildExpenseTagSummary(
+    filteredExpenseRows
+  );
 
-  const expensesByTag = {};
-
-  expenseTagList.forEach((item) => {
-    expensesByTag[item.name] = item.total;
-  });
+  const debtGivenDetails = buildDebtPersonSummary(filteredDebtRows, 'Given');
+  const debtTakenDetails = buildDebtPersonSummary(filteredDebtRows, 'Taken');
 
   const expensesByMedium = {};
 
@@ -185,6 +285,8 @@ export function calculateFinancialSummary({
     financialPosition,
     expensesByTag,
     expenseTagList,
+    debtGivenDetails,
+    debtTakenDetails,
     expensesByMedium,
     expensesByFlag,
     adviceList,

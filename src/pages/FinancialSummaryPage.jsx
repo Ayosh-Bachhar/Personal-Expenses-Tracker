@@ -52,6 +52,8 @@ function FinancialSummaryPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [showExpenseTagList, setShowExpenseTagList] = useState(false);
+  const [showDebtGivenDetails, setShowDebtGivenDetails] = useState(false);
+  const [showDebtTakenDetails, setShowDebtTakenDetails] = useState(false);
 
   const { loadAllSpreadsheetData } = useGoogleSheetsApi({
     accessToken,
@@ -70,7 +72,9 @@ function FinancialSummaryPage() {
 
     try {
       setIsLoading(true);
+
       const data = await loadAllSpreadsheetData();
+
       setSpreadsheetData(data);
     } catch (error) {
       setErrorMessage(error.message || 'Failed to load summary data.');
@@ -86,6 +90,8 @@ function FinancialSummaryPage() {
 
   useEffect(() => {
     setShowExpenseTagList(false);
+    setShowDebtGivenDetails(false);
+    setShowDebtTakenDetails(false);
   }, [summaryType, selectedValue]);
 
   const availablePeriods = useMemo(() => {
@@ -114,15 +120,9 @@ function FinancialSummaryPage() {
     expenseRows: spreadsheetData.expenseRows,
   });
 
-  const filteredExpenseRows = useMemo(() => {
-    return spreadsheetData.expenseRows.filter((row) =>
-      isWithinSelectedPeriod(row.timestamp, summaryType, selectedValue)
-    );
-  }, [spreadsheetData.expenseRows, summaryType, selectedValue]);
-
-  const expenseTagList = useMemo(() => {
-    return buildExpenseTagList(filteredExpenseRows);
-  }, [filteredExpenseRows]);
+  const expenseTagList = summary.expenseTagList || [];
+  const debtGivenDetails = summary.debtGivenDetails || [];
+  const debtTakenDetails = summary.debtTakenDetails || [];
 
   function handleSummaryTypeChange(event) {
     const nextType = event.target.value;
@@ -131,10 +131,8 @@ function FinancialSummaryPage() {
 
     if (nextType === 'monthly') {
       setSelectedValue(availablePeriods.months[0] || getCurrentMonthKey());
-    } else if (nextType === 'yearly') {
-      setSelectedValue(availablePeriods.years[0] || getCurrentYearKey());
     } else {
-      setSelectedValue('all');
+      setSelectedValue(availablePeriods.years[0] || getCurrentYearKey());
     }
   }
 
@@ -239,20 +237,32 @@ function FinancialSummaryPage() {
           accent="text-violet-400"
         />
 
-        <SummaryCard
+        <DebtSummaryCard
           title="Debt Given"
           value={formatCurrency(summary.debtGiven, currency)}
           subtitle="Money others currently owe you"
           icon={<HandCoins size={28} />}
           accent="text-emerald-400"
+          isOpen={showDebtGivenDetails}
+          onToggle={() => setShowDebtGivenDetails((currentValue) => !currentValue)}
+          details={debtGivenDetails}
+          currency={currency}
+          emptyMessage="No active debt given records."
+          detailsHeading="People who owe you money"
         />
 
-        <SummaryCard
+        <DebtSummaryCard
           title="Debt Taken"
           value={formatCurrency(summary.debtTaken, currency)}
           subtitle="Money you currently owe others"
           icon={<HandCoins size={28} />}
           accent="text-amber-400"
+          isOpen={showDebtTakenDetails}
+          onToggle={() => setShowDebtTakenDetails((currentValue) => !currentValue)}
+          details={debtTakenDetails}
+          currency={currency}
+          emptyMessage="No active debt taken records."
+          detailsHeading="People you owe money to"
         />
 
         <SummaryCard
@@ -290,10 +300,9 @@ function FinancialSummaryPage() {
                       <div className="flex items-start justify-between gap-4">
                         <div className="min-w-0">
                           <p className="text-base font-bold text-slate-100">{item.name}</p>
-
-                          {item.note ? (
+                          {item.updateNote ? (
                             <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-amber-300">
-                              {item.note}
+                              {item.updateNote}
                             </p>
                           ) : null}
                         </div>
@@ -461,6 +470,75 @@ function ChartBox({ title, children }) {
   );
 }
 
+function DebtSummaryCard({
+  title,
+  value,
+  subtitle,
+  icon,
+  accent = 'text-emerald-400',
+  isOpen,
+  onToggle,
+  details,
+  currency,
+  emptyMessage,
+  detailsHeading,
+}) {
+  return (
+    <div className="rounded-3xl border border-slate-800 bg-slate-900/80 p-5 shadow-xl">
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <p className="text-sm font-bold text-slate-400">{title}</p>
+          <p className="mt-3 text-3xl font-black text-slate-100">{value}</p>
+
+          {subtitle ? (
+            <p className="mt-2 text-sm leading-6 text-slate-500">{subtitle}</p>
+          ) : null}
+        </div>
+
+        {icon ? <div className={accent}>{icon}</div> : null}
+      </div>
+
+      <button
+        type="button"
+        onClick={onToggle}
+        className="mt-5 flex w-full items-center justify-center rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm font-black text-slate-100 transition hover:border-emerald-500 hover:text-emerald-300"
+      >
+        {isOpen ? 'Hide Details' : 'Details'}
+      </button>
+
+      {isOpen ? (
+        <div className="mt-4 rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
+          <p className="text-sm font-bold text-slate-300">{detailsHeading}</p>
+
+          {details.length > 0 ? (
+            <div className="mt-3 max-h-72 space-y-3 overflow-y-auto pr-1">
+              {details.map((item) => (
+                <div
+                  key={item.name}
+                  className="rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <p className="min-w-0 text-base font-bold text-slate-100">
+                      {item.name}
+                    </p>
+                    <p className="shrink-0 text-lg font-black text-emerald-300">
+                      {formatCurrency(item.total, currency)}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="mt-3 rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-slate-400">
+              {emptyMessage}
+            </div>
+          )}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function convertMapToChartData(mapObject) {
   return Object.entries(mapObject)
     .map(([name, amount]) => ({
@@ -546,76 +624,6 @@ function buildTrendChartData({ balanceRows, expenseRows }) {
   return Object.values(periodMap).sort((a, b) => {
     return a.period.localeCompare(b.period);
   });
-}
-
-function buildExpenseTagList(filteredExpenseRows) {
-  const tagMap = new Map();
-
-  filteredExpenseRows.forEach((row, index) => {
-    const name = normalizeTag(row.tag);
-    const key = name.toLowerCase();
-    const amount = Number(row.amount || 0);
-    const time = getTimestampValue(row.timestamp);
-
-    if (!tagMap.has(key)) {
-      tagMap.set(key, {
-        name,
-        total: 0,
-        firstIndex: index,
-        latestTime: time,
-        latestIndex: index,
-        latestAmount: amount,
-      });
-    }
-
-    const entry = tagMap.get(key);
-    entry.total += amount;
-
-    if (time > entry.latestTime || (time === entry.latestTime && index > entry.latestIndex)) {
-      entry.latestTime = time;
-      entry.latestIndex = index;
-      entry.latestAmount = amount;
-    }
-  });
-
-  return Array.from(tagMap.values())
-    .sort((a, b) => a.firstIndex - b.firstIndex)
-    .map((entry) => {
-      const previousTotal = entry.total - entry.latestAmount;
-
-      return {
-        name: entry.name,
-        total: entry.total,
-        note:
-          previousTotal > 0
-            ? `UPDATED (Net total increased by ${entry.latestAmount} from ${previousTotal})`
-            : '',
-        isUpdated: previousTotal > 0,
-      };
-    });
-}
-
-function normalizeTag(value) {
-  return String(value || '').trim() || 'Other';
-}
-
-function getTimestampValue(timestamp) {
-  const date = new Date(timestamp);
-  const time = date.getTime();
-
-  return Number.isNaN(time) ? 0 : time;
-}
-
-function isWithinSelectedPeriod(timestamp, summaryType, selectedValue) {
-  if (summaryType === 'monthly') {
-    return getYearMonthKey(timestamp) === selectedValue;
-  }
-
-  if (summaryType === 'yearly') {
-    return getYearKey(timestamp) === selectedValue;
-  }
-
-  return true;
 }
 
 function getCurrentMonthKey() {
