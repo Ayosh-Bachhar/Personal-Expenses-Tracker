@@ -247,8 +247,10 @@ function FinancialSummaryPage() {
           onToggle={() => setShowDebtGivenDetails((currentValue) => !currentValue)}
           details={debtGivenDetails}
           currency={currency}
-          emptyMessage="No active debt given records."
+          emptyMessage="No debt given records."
           detailsHeading="People who owe you money"
+          increaseLabel="Given"
+          decreaseLabel="Collected"
         />
 
         <DebtSummaryCard
@@ -261,8 +263,10 @@ function FinancialSummaryPage() {
           onToggle={() => setShowDebtTakenDetails((currentValue) => !currentValue)}
           details={debtTakenDetails}
           currency={currency}
-          emptyMessage="No active debt taken records."
+          emptyMessage="No debt taken records."
           detailsHeading="People you owe money to"
+          increaseLabel="Taken"
+          decreaseLabel="Paid Back"
         />
 
         <SummaryCard
@@ -482,7 +486,15 @@ function DebtSummaryCard({
   currency,
   emptyMessage,
   detailsHeading,
+  increaseLabel,
+  decreaseLabel,
 }) {
+  const [hideSettled, setHideSettled] = useState(false);
+
+  const visibleDetails = hideSettled
+    ? details.filter((item) => !item.isSettled)
+    : details;
+
   return (
     <div className="rounded-3xl border border-slate-800 bg-slate-900/80 p-5 shadow-xl">
       <div className="flex items-start justify-between gap-4">
@@ -508,11 +520,23 @@ function DebtSummaryCard({
 
       {isOpen ? (
         <div className="mt-4 rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
-          <p className="text-sm font-bold text-slate-300">{detailsHeading}</p>
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-sm font-bold text-slate-300">{detailsHeading}</p>
 
-          {details.length > 0 ? (
+            <label className="flex shrink-0 items-center gap-2 text-xs font-semibold text-slate-400">
+              <input
+                type="checkbox"
+                checked={hideSettled}
+                onChange={(event) => setHideSettled(event.target.checked)}
+                className="h-4 w-4 rounded border-slate-600 bg-slate-950 accent-emerald-500"
+              />
+              Hide settled
+            </label>
+          </div>
+
+          {visibleDetails.length > 0 ? (
             <div className="mt-3 max-h-72 space-y-3 overflow-y-auto pr-1">
-              {details.map((item) => (
+              {visibleDetails.map((item) => (
                 <div
                   key={item.name}
                   className="rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3"
@@ -521,9 +545,39 @@ function DebtSummaryCard({
                     <p className="min-w-0 text-base font-bold text-slate-100">
                       {item.name}
                     </p>
-                    <p className="shrink-0 text-lg font-black text-emerald-300">
-                      {formatCurrency(item.total, currency)}
-                    </p>
+
+                    {item.isSettled ? (
+                      <span className="shrink-0 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-[10px] font-black uppercase tracking-wide text-emerald-300">
+                        ✅ Settled
+                      </span>
+                    ) : (
+                      <span className="shrink-0 rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-1 text-[10px] font-black uppercase tracking-wide text-amber-300">
+                        🟢 Active
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="mt-3 grid grid-cols-3 gap-2 text-xs text-slate-400">
+                    <div>
+                      <p className="text-slate-500">{increaseLabel}</p>
+                      <p className="mt-1 text-sm font-bold text-slate-200">
+                        {formatCurrency(item.increaseTotal, currency)}
+                      </p>
+                    </div>
+
+                    <div>
+                      <p className="text-slate-500">{decreaseLabel}</p>
+                      <p className="mt-1 text-sm font-bold text-slate-200">
+                        {formatCurrency(item.decreaseTotal, currency)}
+                      </p>
+                    </div>
+
+                    <div>
+                      <p className="text-slate-500">Remaining</p>
+                      <p className="mt-1 text-sm font-bold text-emerald-300">
+                        {formatCurrency(Math.max(item.remaining, 0), currency)}
+                      </p>
+                    </div>
                   </div>
                 </div>
               ))}

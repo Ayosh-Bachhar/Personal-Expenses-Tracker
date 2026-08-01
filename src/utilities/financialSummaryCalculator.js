@@ -141,11 +141,25 @@ function buildExpenseTagSummary(expenseRows = []) {
   };
 }
 
-function buildDebtPersonSummary(debtRows = [], targetStatus) {
+// Debt records use 4 statuses instead of a single true/false "IsSettled" flag:
+//   Given      -> increases what a person owes you
+//   Collected  -> decreases what a person owes you
+//   Taken      -> increases what you owe a person
+//   Repaid     -> decreases what you owe a person
+//
+// A "family" pairs a status with the status that offsets it, so history is
+// never edited — settlement is derived by netting per person instead.
+const DEBT_FAMILIES = {
+  given: { increaseStatus: 'Given', decreaseStatus: 'Collected' },
+  taken: { increaseStatus: 'Taken', decreaseStatus: 'Repaid' },
+};
+
+function buildDebtPersonSummary(debtRows = [], family) {
+  const { increaseStatus, decreaseStatus } = DEBT_FAMILIES[family];
   const personBuckets = new Map();
 
   debtRows.forEach((row, index) => {
-    if (row.status !== targetStatus || row.isSettled === true) {
+    if (row.status !== increaseStatus && row.status !== decreaseStatus) {
       return;
     }
 
@@ -156,13 +170,19 @@ function buildDebtPersonSummary(debtRows = [], targetStatus) {
     if (!personBuckets.has(key)) {
       personBuckets.set(key, {
         name: personName,
-        total: 0,
+        increaseTotal: 0,
+        decreaseTotal: 0,
         firstIndex: index,
       });
     }
 
     const personBucket = personBuckets.get(key);
-    personBucket.total += amount;
+
+    if (row.status === increaseStatus) {
+      personBucket.increaseTotal += amount;
+    } else {
+      personBucket.decreaseTotal += amount;
+    }
 
     if (index < personBucket.firstIndex) {
       personBucket.firstIndex = index;
@@ -171,17 +191,30 @@ function buildDebtPersonSummary(debtRows = [], targetStatus) {
   });
 
   return Array.from(personBuckets.values())
+    .map((item) => {
+      const remaining = item.increaseTotal - item.decreaseTotal;
+
+      return {
+        name: item.name,
+        increaseTotal: item.increaseTotal,
+        decreaseTotal: item.decreaseTotal,
+        remaining,
+        isSettled: remaining <= 0,
+      };
+    })
     .sort((firstItem, secondItem) => {
-      if (secondItem.total !== firstItem.total) {
-        return secondItem.total - firstItem.total;
+      if (secondItem.remaining !== firstItem.remaining) {
+        return secondItem.remaining - firstItem.remaining;
       }
 
       return firstItem.name.localeCompare(secondItem.name);
-    })
-    .map((item) => ({
-      name: item.name,
-      total: item.total,
-    }));
+    });
+}
+
+function sumPositiveRemaining(personSummaries = []) {
+  return personSummaries.reduce((sum, item) => {
+    return sum + Math.max(item.remaining, 0);
+  }, 0);
 }
 
 export function calculateFinancialSummary({
@@ -211,21 +244,11 @@ export function calculateFinancialSummary({
     return sum + toNumber(row.amount);
   }, 0);
 
-  const debtGiven = filteredDebtRows.reduce((sum, row) => {
-    if (row.status === 'Given' && row.isSettled !== true) {
-      return sum + toNumber(row.amount);
-    }
+  const debtGivenDetails = buildDebtPersonSummary(filteredDebtRows, 'given');
+  const debtTakenDetails = buildDebtPersonSummary(filteredDebtRows, 'taken');
 
-    return sum;
-  }, 0);
-
-  const debtTaken = filteredDebtRows.reduce((sum, row) => {
-    if (row.status === 'Taken' && row.isSettled !== true) {
-      return sum + toNumber(row.amount);
-    }
-
-    return sum;
-  }, 0);
+  const debtGiven = sumPositiveRemaining(debtGivenDetails);
+  const debtTaken = sumPositiveRemaining(debtTakenDetails);
 
   const rawWallet = totalInput - totalExpenses;
   const availableWallet = totalInput - totalExpenses - debtGiven + debtTaken;
@@ -235,9 +258,6 @@ export function calculateFinancialSummary({
   const { expensesByTag, expenseTagList } = buildExpenseTagSummary(
     filteredExpenseRows
   );
-
-  const debtGivenDetails = buildDebtPersonSummary(filteredDebtRows, 'Given');
-  const debtTakenDetails = buildDebtPersonSummary(filteredDebtRows, 'Taken');
 
   const expensesByMedium = {};
 
