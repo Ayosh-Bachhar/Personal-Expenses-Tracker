@@ -60,7 +60,7 @@ function DebtLogPage() {
       case 'Given':
         return {
           personLabel: 'Person You Lent Money To',
-          personPlaceholder: 'Example: Rahim',
+          personPlaceholder: 'Example: Ayosh',
           reasonPlaceholder: 'Example: Emergency help',
           buttonText: 'Save Debt Given',
           helpTitle: 'Giving Money',
@@ -71,7 +71,7 @@ function DebtLogPage() {
       case 'Collected':
         return {
           personLabel: 'Person Who Returned Money',
-          personPlaceholder: 'Example: Rahim',
+          personPlaceholder: 'Example: Ayosh',
           reasonPlaceholder: 'Example: Partial repayment',
           buttonText: 'Save Collection',
           helpTitle: 'Money Collected',
@@ -82,7 +82,7 @@ function DebtLogPage() {
       case 'Taken':
         return {
           personLabel: 'Person You Borrowed From',
-          personPlaceholder: 'Example: Karim',
+          personPlaceholder: 'Example: Robin',
           reasonPlaceholder: 'Example: Tuition fee',
           buttonText: 'Save Borrowed Money',
           helpTitle: 'Borrowing Money',
@@ -93,7 +93,7 @@ function DebtLogPage() {
       case 'Repaid':
         return {
           personLabel: 'Person You Paid Back',
-          personPlaceholder: 'Example: Karim',
+          personPlaceholder: 'Example: Robin',
           reasonPlaceholder: 'Example: Monthly repayment',
           buttonText: 'Save Repayment',
           helpTitle: 'Repayment',
@@ -104,7 +104,7 @@ function DebtLogPage() {
       default:
         return {
           personLabel: 'Person Name',
-          personPlaceholder: 'Example: Rahim',
+          personPlaceholder: 'Example: Ayosh',
           reasonPlaceholder: 'Reason',
           buttonText: 'Save Debt Record',
           helpTitle: 'Debt Transaction',
@@ -357,7 +357,7 @@ function DebtLogPage() {
                 <p className="text-slate-400">
                   Example:
                   <br />
-                  Rahim borrowed 1000 from you.
+                  Ayosh borrowed 1000 from you.
                 </p>
               </div>
 
@@ -373,7 +373,7 @@ function DebtLogPage() {
                 <p className="text-slate-400">
                   Example:
                   <br />
-                  Rahim returned 300.
+                  Ayosh returned 300.
                 </p>
               </div>
 
@@ -389,7 +389,7 @@ function DebtLogPage() {
                 <p className="text-slate-400">
                   Example:
                   <br />
-                  You borrowed 2000 from Karim.
+                  You borrowed 2000 from Robin.
                 </p>
               </div>
 
@@ -405,7 +405,7 @@ function DebtLogPage() {
                 <p className="text-slate-400">
                   Example:
                   <br />
-                  You paid Karim 500.
+                  You paid Robin 500.
                 </p>
               </div>
 
