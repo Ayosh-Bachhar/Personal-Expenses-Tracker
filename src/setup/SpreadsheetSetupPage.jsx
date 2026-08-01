@@ -204,7 +204,7 @@ function SpreadsheetSetupPage() {
 
               <p>Monthly sheet header:</p>
 
-              <p className="rounded-2xl bg-slate-950 p-4 text-xs text-slate-300">
+              <p className="break-words rounded-2xl bg-slate-950 p-4 text-xs text-slate-300">
                 ID | Date | Entry_Type | Amount | Source | Tag | Description | Medium | Flag | Debt_Name | Debt_Status | Reason | IsSettled
               </p>
 
@@ -223,7 +223,7 @@ function SpreadsheetSetupPage() {
               Open your Google Sheet. Copy the part of the URL between /d/ and /edit.
             </p>
 
-            <div className="mt-4 rounded-2xl bg-slate-950 p-4 text-xs leading-6 text-slate-400">
+            <div className="mt-4 break-all rounded-2xl bg-slate-950 p-4 text-xs leading-6 text-slate-400">
               https://docs.google.com/spreadsheets/d/
               <span className="text-emerald-400">SPREADSHEET_ID</span>
               /edit
