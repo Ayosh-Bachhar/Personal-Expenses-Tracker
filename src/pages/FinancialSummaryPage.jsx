@@ -51,6 +51,7 @@ function FinancialSummaryPage() {
   const [selectedValue, setSelectedValue] = useState(getCurrentMonthKey());
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [showExpenseTagList, setShowExpenseTagList] = useState(false);
 
   const { loadAllSpreadsheetData } = useGoogleSheetsApi({
     accessToken,
@@ -69,9 +70,7 @@ function FinancialSummaryPage() {
 
     try {
       setIsLoading(true);
-
       const data = await loadAllSpreadsheetData();
-
       setSpreadsheetData(data);
     } catch (error) {
       setErrorMessage(error.message || 'Failed to load summary data.');
@@ -84,6 +83,10 @@ function FinancialSummaryPage() {
     loadSummaryData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    setShowExpenseTagList(false);
+  }, [summaryType, selectedValue]);
 
   const availablePeriods = useMemo(() => {
     return buildAvailablePeriods({
@@ -111,6 +114,16 @@ function FinancialSummaryPage() {
     expenseRows: spreadsheetData.expenseRows,
   });
 
+  const filteredExpenseRows = useMemo(() => {
+    return spreadsheetData.expenseRows.filter((row) =>
+      isWithinSelectedPeriod(row.timestamp, summaryType, selectedValue)
+    );
+  }, [spreadsheetData.expenseRows, summaryType, selectedValue]);
+
+  const expenseTagList = useMemo(() => {
+    return buildExpenseTagList(filteredExpenseRows);
+  }, [filteredExpenseRows]);
+
   function handleSummaryTypeChange(event) {
     const nextType = event.target.value;
 
@@ -118,8 +131,10 @@ function FinancialSummaryPage() {
 
     if (nextType === 'monthly') {
       setSelectedValue(availablePeriods.months[0] || getCurrentMonthKey());
-    } else {
+    } else if (nextType === 'yearly') {
       setSelectedValue(availablePeriods.years[0] || getCurrentYearKey());
+    } else {
+      setSelectedValue('all');
     }
   }
 
@@ -263,7 +278,41 @@ function FinancialSummaryPage() {
 
       <div className="mt-6 grid gap-6 xl:grid-cols-2">
         <ChartBox title="Expense by Tag">
-          {tagChartData.length > 0 ? (
+          {showExpenseTagList ? (
+            expenseTagList.length > 0 ? (
+              <div className="flex min-h-[300px] flex-col">
+                <div className="max-h-[300px] space-y-3 overflow-y-auto pr-1">
+                  {expenseTagList.map((item) => (
+                    <div
+                      key={item.name}
+                      className="rounded-2xl border border-slate-800 bg-slate-950/60 px-4 py-3"
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="min-w-0">
+                          <p className="text-base font-bold text-slate-100">{item.name}</p>
+
+                          {item.note ? (
+                            <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-amber-300">
+                              {item.note}
+                            </p>
+                          ) : null}
+                        </div>
+
+                        <p className="shrink-0 text-lg font-black text-emerald-300">
+                          {formatCurrency(item.total, currency)}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <EmptyStateMessage
+                title="No expense data"
+                message="Add expense entries to see category analysis."
+              />
+            )
+          ) : tagChartData.length > 0 ? (
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={tagChartData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
@@ -279,6 +328,14 @@ function FinancialSummaryPage() {
               message="Add expense entries to see category analysis."
             />
           )}
+
+          <button
+            type="button"
+            onClick={() => setShowExpenseTagList((currentValue) => !currentValue)}
+            className="mt-5 flex w-full items-center justify-center rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 font-black text-slate-100 transition hover:border-emerald-500 hover:text-emerald-300"
+          >
+            {showExpenseTagList ? 'Show Chart' : 'Show List'}
+          </button>
         </ChartBox>
 
         <ChartBox title="Balance vs Expenses Trend">
@@ -372,9 +429,7 @@ function FinancialSummaryPage() {
       </div>
 
       <div className="mt-6 rounded-3xl border border-slate-800 bg-slate-900/80 p-6 shadow-xl">
-        <h2 className="text-2xl font-black text-slate-100">
-          Rule-Based Financial Advice
-        </h2>
+        <h2 className="text-2xl font-black text-slate-100">Rule-Based Financial Advice</h2>
 
         <div className="mt-5 grid gap-3">
           {summary.adviceList.map((advice) => (
@@ -389,10 +444,7 @@ function FinancialSummaryPage() {
       </div>
 
       <div className="mt-6">
-        <SubmitButton
-          disabled={!appConfig?.spreadsheetId}
-          loading={false}
-        >
+        <SubmitButton disabled={!appConfig?.spreadsheetId} loading={false}>
           Summary loaded from Google Sheets
         </SubmitButton>
       </div>
@@ -494,6 +546,76 @@ function buildTrendChartData({ balanceRows, expenseRows }) {
   return Object.values(periodMap).sort((a, b) => {
     return a.period.localeCompare(b.period);
   });
+}
+
+function buildExpenseTagList(filteredExpenseRows) {
+  const tagMap = new Map();
+
+  filteredExpenseRows.forEach((row, index) => {
+    const name = normalizeTag(row.tag);
+    const key = name.toLowerCase();
+    const amount = Number(row.amount || 0);
+    const time = getTimestampValue(row.timestamp);
+
+    if (!tagMap.has(key)) {
+      tagMap.set(key, {
+        name,
+        total: 0,
+        firstIndex: index,
+        latestTime: time,
+        latestIndex: index,
+        latestAmount: amount,
+      });
+    }
+
+    const entry = tagMap.get(key);
+    entry.total += amount;
+
+    if (time > entry.latestTime || (time === entry.latestTime && index > entry.latestIndex)) {
+      entry.latestTime = time;
+      entry.latestIndex = index;
+      entry.latestAmount = amount;
+    }
+  });
+
+  return Array.from(tagMap.values())
+    .sort((a, b) => a.firstIndex - b.firstIndex)
+    .map((entry) => {
+      const previousTotal = entry.total - entry.latestAmount;
+
+      return {
+        name: entry.name,
+        total: entry.total,
+        note:
+          previousTotal > 0
+            ? `UPDATED (Net total increased by ${entry.latestAmount} from ${previousTotal})`
+            : '',
+        isUpdated: previousTotal > 0,
+      };
+    });
+}
+
+function normalizeTag(value) {
+  return String(value || '').trim() || 'Other';
+}
+
+function getTimestampValue(timestamp) {
+  const date = new Date(timestamp);
+  const time = date.getTime();
+
+  return Number.isNaN(time) ? 0 : time;
+}
+
+function isWithinSelectedPeriod(timestamp, summaryType, selectedValue) {
+  if (summaryType === 'monthly') {
+    return getYearMonthKey(timestamp) === selectedValue;
+  }
+
+  if (summaryType === 'yearly') {
+    return getYearKey(timestamp) === selectedValue;
+  }
+
+  return true;
 }
 
 function getCurrentMonthKey() {

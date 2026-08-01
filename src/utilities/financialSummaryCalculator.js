@@ -22,10 +22,71 @@ function isWithinSelectedPeriod(timestamp, summaryType, selectedValue) {
   return true;
 }
 
+function normalizeTag(value) {
+  return String(value || '').trim() || 'Other';
+}
+
+function getTimestampValue(timestamp) {
+  const date = new Date(timestamp);
+  const time = date.getTime();
+
+  return Number.isNaN(time) ? 0 : time;
+}
+
+function buildExpenseTagList(filteredExpenseRows) {
+  const tagMap = new Map();
+
+  filteredExpenseRows.forEach((row, index) => {
+    const tagName = normalizeTag(row.tag);
+    const key = tagName.toLowerCase();
+    const amount = toNumber(row.amount);
+    const timestampValue = getTimestampValue(row.timestamp);
+
+    if (!tagMap.has(key)) {
+      tagMap.set(key, {
+        name: tagName,
+        total: 0,
+        firstIndex: index,
+        latestTimestamp: timestampValue,
+        latestIndex: index,
+        latestAmount: amount,
+      });
+    }
+
+    const entry = tagMap.get(key);
+    entry.total += amount;
+
+    if (
+      timestampValue > entry.latestTimestamp ||
+      (timestampValue === entry.latestTimestamp && index > entry.latestIndex)
+    ) {
+      entry.latestTimestamp = timestampValue;
+      entry.latestIndex = index;
+      entry.latestAmount = amount;
+    }
+  });
+
+  return Array.from(tagMap.values())
+    .sort((a, b) => a.firstIndex - b.firstIndex)
+    .map((entry) => {
+      const previousTotal = entry.total - entry.latestAmount;
+
+      return {
+        name: entry.name,
+        total: entry.total,
+        note:
+          previousTotal > 0
+            ? `UPDATED (Net total increased by ${entry.latestAmount} from ${previousTotal})`
+            : '',
+        isUpdated: previousTotal > 0,
+      };
+    });
+}
+
 export function calculateFinancialSummary({
-  balanceRows,
-  expenseRows,
-  debtRows,
+  balanceRows = [],
+  expenseRows = [],
+  debtRows = [],
   summaryType,
   selectedValue,
 }) {
@@ -70,16 +131,12 @@ export function calculateFinancialSummary({
   const netDebtPosition = debtGiven - debtTaken;
   const financialPosition = availableWallet + netDebtPosition;
 
+  const expenseTagList = buildExpenseTagList(filteredExpenseRows);
+
   const expensesByTag = {};
 
-  filteredExpenseRows.forEach((row) => {
-    const tag = row.tag || 'Other';
-
-    if (!expensesByTag[tag]) {
-      expensesByTag[tag] = 0;
-    }
-
-    expensesByTag[tag] += toNumber(row.amount);
+  expenseTagList.forEach((item) => {
+    expensesByTag[item.name] = item.total;
   });
 
   const expensesByMedium = {};
@@ -127,6 +184,7 @@ export function calculateFinancialSummary({
     netDebtPosition,
     financialPosition,
     expensesByTag,
+    expenseTagList,
     expensesByMedium,
     expensesByFlag,
     adviceList,
